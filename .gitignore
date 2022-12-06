@@ -1,5 +1,5 @@
 
-/targetca
+/target
 /examples/target
 /examples/*/target
 Cargo.lock
