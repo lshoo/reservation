@@ -9,12 +9,12 @@ A core reservation service that solves the problem of reserving a resource for a
 
 ## Motivation
 
-We need a common solution for various reservation requirements: 
-1) calendar booking; 
-2) hotel/room booking; 
-3) meeting room booking; 
-4) parking lot booking; 
-5) etc. 
+We need a common solution for various reservation requirements:
+1) calendar booking;
+2) hotel/room booking;
+3) meeting room booking;
+4) parking lot booking;
+5) etc.
 
 Repeatedly building features for these requirements is a waste of time and resources. We should have a common solution that can be used by all teams.
 
