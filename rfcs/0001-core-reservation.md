@@ -153,7 +153,19 @@ CREATE INDEX reservations_user_id_idx ON rsvp.reservations (user_id);
 -- if resource_id is null, find all reservations within during for the user
 -- if both are null, find all reservations within during
 -- if both set, find all reservations within during for the resource and user
-CREATE OR REPLACE FUNCTION rsvp.query(uid text, rid text, during: TSTZRANGE) RETURNS TABLE rsvp.reservations AS $$ $$ LANGUAGE plpgsql;
+CREATE OR REPLACE FUNCTION rsvp.query(uid text, rid text, during TSTZRANGE) RETURNS TABLE (LIKE rsvp.reservations) AS $$
+BEGIN
+    IF uid is NULL AND rid is NULL THEN
+        RETURN QUERY SELECT * FROM  rsvp.reservations WHERE timespan && during;
+    ELSIF uid IS NULL THEN
+        RETURN QUERY SELECT * FROM rsvp.reservations WHERE resource_id = rid AND during @> timespan;
+    ELSIF rid IS NULL THEN
+        RETURN QUERY SELECT * FROM rsvp.reservations WHERE user_id = uid AND during @> timespan;
+    ELSE
+        RETURN QUERY SELECT * FROM rsvp.reservations WHERE user_id = uid AND resource_id = rid AND during @> timespan;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
 
 -- resevation change queue
 CREATE TABLE rsvp.reservation_changes (

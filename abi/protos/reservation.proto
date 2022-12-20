@@ -72,13 +72,17 @@ message GetResponse {
     Reservation reservation = 1;
 }
 
-message QueryRequest {
+message ReservationQuery {
     string resource_id = 1;
     string user_id = 2;
     // use status to filter result. If UNKNOWN, return all reservations
     ReservationStatus status = 3;
     google.protobuf.Timestamp start = 4;
     google.protobuf.Timestamp end = 5;
+}
+
+message QueryRequest {
+    ReservationQuery query = 1;
 }
 
 message ListenRequest {}
@@ -97,4 +101,5 @@ service ReservationService {
 
     // another system could monitor newly added/confirmed/canceled reservation
     rpc listen(ListenRequest) returns (stream Reservation);
+
 }
