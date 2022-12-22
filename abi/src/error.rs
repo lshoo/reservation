@@ -1,0 +1,49 @@
+use sqlx::postgres::PgDatabaseError;
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    // #[error("data store disconnected")]
+    // Disconnect(#[from] io::Error),
+    // #[error("the data for key `{0}` is not available")]
+    // Redaction(String),
+    // #[error("invalid header (expected {expected:?}, found {found:?})")]
+    // InvalidHeader {
+    //     expected: String,
+    //     found: String,
+    // },
+    #[error("Database error")]
+    DbError(sqlx::Error),
+
+    #[error("{0}")]
+    ConflictReservation(String),
+
+    #[error("invalid start or end time for the reservation")]
+    InvalidTime,
+
+    #[error("invalid user id {0}")]
+    InvalidUserId(String),
+
+    #[error("invalid resource id {0}")]
+    InvalidResourceId(String),
+
+    #[error("unknown error")]
+    Unknown,
+}
+
+impl From<sqlx::Error> for Error {
+    fn from(e: sqlx::Error) -> Self {
+        match e {
+            sqlx::Error::Database(e) => {
+                let err: &PgDatabaseError = e.downcast_ref();
+                match (err.code(), err.schema(), err.table()) {
+                    ("23P01", Some("rsvp"), Some("reservations")) => {
+                        Error::ConflictReservation(err.detail().unwrap().to_string())
+                    }
+                    _ => Error::DbError(sqlx::Error::Database(e)),
+                }
+            }
+            _ => Error::DbError(e),
+        }
+    }
+}

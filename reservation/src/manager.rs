@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::{ReservationError, ReservationId, ReservationManager, Rsvp};
+use crate::{Error, ReservationId, ReservationManager, Rsvp};
 
 use chrono::{DateTime, Utc};
 use sqlx::{postgres::types::PgRange, types::Uuid, PgPool, Row};
@@ -13,18 +13,10 @@ impl ReservationManager {
 
 #[async_trait]
 impl Rsvp for ReservationManager {
-    async fn reserve(
-        &self,
-        mut rsvp: abi::Reservation,
-    ) -> Result<abi::Reservation, ReservationError> {
-        if rsvp.start.is_none() || rsvp.end.is_none() {
-            return Err(ReservationError::InvalidTime);
-        }
+    async fn reserve(&self, mut rsvp: abi::Reservation) -> Result<abi::Reservation, Error> {
+        rsvp.validate()?;
 
-        let start = abi::convert_to_utc_time(rsvp.start.clone().unwrap());
-        let end = abi::convert_to_utc_time(rsvp.end.clone().unwrap());
-
-        let timespan: PgRange<DateTime<Utc>> = (start..end).into();
+        let timespan: PgRange<DateTime<Utc>> = rsvp.get_timespan().into();
 
         let status = abi::ReservationStatus::from_i32(rsvp.status)
             .unwrap_or(abi::ReservationStatus::Pending);
@@ -46,10 +38,7 @@ impl Rsvp for ReservationManager {
         Ok(rsvp)
     }
 
-    async fn change_status(
-        &self,
-        _id: ReservationId,
-    ) -> Result<abi::Reservation, ReservationError> {
+    async fn change_status(&self, _id: ReservationId) -> Result<abi::Reservation, Error> {
         todo!()
     }
 
@@ -57,22 +46,19 @@ impl Rsvp for ReservationManager {
         &self,
         _id: ReservationId,
         _note: String,
-    ) -> Result<abi::Reservation, ReservationError> {
+    ) -> Result<abi::Reservation, Error> {
         todo!()
     }
 
-    async fn delete_reservation(&self, _id: ReservationId) -> Result<(), ReservationError> {
+    async fn delete_reservation(&self, _id: ReservationId) -> Result<(), Error> {
         todo!()
     }
 
-    async fn get(&self, _id: ReservationId) -> Result<Option<abi::Reservation>, ReservationError> {
+    async fn get(&self, _id: ReservationId) -> Result<Option<abi::Reservation>, Error> {
         todo!()
     }
 
-    async fn query(
-        &self,
-        _query: abi::ReservationQuery,
-    ) -> Result<Vec<abi::Reservation>, ReservationError> {
+    async fn query(&self, _query: abi::ReservationQuery) -> Result<Vec<abi::Reservation>, Error> {
         todo!()
     }
 }
@@ -83,7 +69,7 @@ mod tests {
     use super::*;
 
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
-    async fn reserve_should_work_for_valid_window() -> Result<(), ReservationError> {
+    async fn reserve_should_work_for_valid_window() -> Result<(), Error> {
         let manager = ReservationManager::new(migrated_pool.clone());
 
         let rsvp = abi::Reservation::new_pending(
@@ -96,6 +82,39 @@ mod tests {
 
         let rsvp = manager.reserve(rsvp).await?;
         assert!(!rsvp.id.is_empty());
+
+        Ok(())
+    }
+
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn reserve_conflict_reservation_should_rejected() -> Result<(), Error> {
+        let manager = ReservationManager::new(migrated_pool.clone());
+
+        let rsvp1 = abi::Reservation::new_pending(
+            "james id",
+            "Ocean view room 518",
+            "2022-12-25T15:00:00-0700".parse().unwrap(),
+            "2022-12-30T00:00:00-0700".parse().unwrap(),
+            "I'll arrive at 3pm, Please help to upgrade to execuitive room if possible.",
+        );
+
+        let rsvp2 = abi::Reservation::new_pending(
+            "james id",
+            "Ocean view room 518",
+            "2022-12-26T15:00:00-0700".parse().unwrap(),
+            "2022-12-31T00:00:00-0700".parse().unwrap(),
+            "I'll arrive at 3pm, Please help to upgrade to execuitive room if possible.",
+        );
+
+        let _rsvp = manager.reserve(rsvp1).await.unwrap();
+        let err = manager.reserve(rsvp2).await.unwrap_err();
+
+        println!("{:?}", err);
+
+        if let abi::Error::ConflictReservation(_info) = err {
+        } else {
+            panic!("expected conflict reservation")
+        }
 
         Ok(())
     }
