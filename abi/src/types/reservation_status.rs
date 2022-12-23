@@ -1,4 +1,4 @@
-use crate::ReservationStatus;
+use crate::{ReservationStatus, RsvpStatus};
 use std::fmt;
 
 impl fmt::Display for ReservationStatus {
@@ -8,6 +8,17 @@ impl fmt::Display for ReservationStatus {
             ReservationStatus::Blocked => write!(f, "blocked"),
             ReservationStatus::Confirmed => write!(f, "confirmed"),
             ReservationStatus::Unknown => write!(f, "unknown"),
+        }
+    }
+}
+
+impl From<RsvpStatus> for ReservationStatus {
+    fn from(rsvp: RsvpStatus) -> Self {
+        match rsvp {
+            RsvpStatus::Unknown => Self::Unknown,
+            RsvpStatus::Pending => Self::Pending,
+            RsvpStatus::Confirmed => Self::Confirmed,
+            RsvpStatus::Blocked => Self::Blocked,
         }
     }
 }

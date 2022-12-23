@@ -38,8 +38,17 @@ impl Rsvp for ReservationManager {
         Ok(rsvp)
     }
 
-    async fn change_status(&self, _id: ReservationId) -> Result<abi::Reservation, Error> {
-        todo!()
+    async fn change_status(&self, id: ReservationId) -> Result<abi::Reservation, Error> {
+        let id: Uuid = Uuid::parse_str(&id).map_err(|_| Error::InvalidReservationId(id.clone()))?;
+        let rsvp: abi::Reservation = sqlx::query_as(
+            "UPDATE rsvp.reservations SET status = 'confirmed' where id = $1 and status = 'pending'
+            RETURNING *",
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(rsvp)
     }
 
     async fn update_note(
@@ -65,6 +74,8 @@ impl Rsvp for ReservationManager {
 
 #[cfg(test)]
 mod tests {
+
+    use abi::ReservationStatus;
 
     use super::*;
 
@@ -115,6 +126,54 @@ mod tests {
         } else {
             panic!("expected conflict reservation")
         }
+
+        Ok(())
+    }
+
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn reserve_change_status_should_work() -> Result<(), Error> {
+        let manager = ReservationManager::new(migrated_pool.clone());
+
+        let rsvp = abi::Reservation::new_pending(
+            "james id",
+            "Ocean view room 5018",
+            "2022-12-25T15:00:00-0700".parse().unwrap(),
+            "2022-12-30T00:00:00-0700".parse().unwrap(),
+            "I'll arrive at 3pm, Please help to upgrade to execuitive room if possible.",
+        );
+
+        let rsvp = manager.reserve(rsvp).await?;
+        let rsvp_id = rsvp.id;
+
+        let rsvp = manager.change_status(rsvp_id).await?;
+
+        assert_eq!(rsvp.status, ReservationStatus::Confirmed as i32);
+
+        Ok(())
+    }
+
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn reserve_change_status_not_pending_should_do_nothing() -> Result<(), Error> {
+        let manager = ReservationManager::new(migrated_pool.clone());
+
+        let rsvp = abi::Reservation::new_pending(
+            "james id",
+            "Ocean view room 5018",
+            "2022-12-25T15:00:00-0700".parse().unwrap(),
+            "2022-12-30T00:00:00-0700".parse().unwrap(),
+            "I'll arrive at 3pm, Please help to upgrade to execuitive room if possible.",
+        );
+
+        let rsvp = manager.reserve(rsvp).await?;
+        let rsvp_id = rsvp.id;
+
+        let rsvp = manager.change_status(rsvp_id.clone()).await?;
+
+        assert_eq!(rsvp.status, ReservationStatus::Confirmed as i32);
+
+        let ret = manager.change_status(rsvp_id).await.unwrap_err();
+
+        assert_eq!(ret, Error::NotFound);
 
         Ok(())
     }

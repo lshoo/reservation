@@ -1,5 +1,9 @@
+mod conflict;
+
 use sqlx::postgres::PgDatabaseError;
 use thiserror::Error;
+
+pub use conflict::*;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -15,11 +19,17 @@ pub enum Error {
     #[error("Database error")]
     DbError(sqlx::Error),
 
-    #[error("{0}")]
+    #[error("reservation not found")]
+    NotFound,
+
+    #[error("Conflict reservation: {0}")]
     ConflictReservation(String),
 
     #[error("invalid start or end time for the reservation")]
     InvalidTime,
+
+    #[error("invalid reservation id {0}")]
+    InvalidReservationId(String),
 
     #[error("invalid user id {0}")]
     InvalidUserId(String),
@@ -29,6 +39,22 @@ pub enum Error {
 
     #[error("unknown error")]
     Unknown,
+}
+
+impl PartialEq for Error {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::DbError(_), Self::DbError(_)) => true,
+            (Self::NotFound, Self::NotFound) => true,
+            (Self::ConflictReservation(v1), Self::ConflictReservation(v2)) => v1 == v2,
+            (Self::InvalidTime, Self::InvalidTime) => true,
+            (Self::InvalidReservationId(v1), Self::InvalidReservationId(v2)) => v1 == v2,
+            (Self::InvalidUserId(v1), Self::InvalidUserId(v2)) => v1 == v2,
+            (Self::InvalidResourceId(v1), Self::InvalidResourceId(v2)) => v1 == v2,
+            (Self::Unknown, Self::Unknown) => true,
+            _ => false,
+        }
+    }
 }
 
 impl From<sqlx::Error> for Error {
@@ -43,6 +69,7 @@ impl From<sqlx::Error> for Error {
                     _ => Error::DbError(sqlx::Error::Database(e)),
                 }
             }
+            sqlx::Error::RowNotFound => Error::NotFound,
             _ => Error::DbError(e),
         }
     }
