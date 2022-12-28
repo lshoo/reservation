@@ -1,9 +1,9 @@
+use abi::Validator;
 use async_trait::async_trait;
 
 use crate::{Error, ReservationId, ReservationManager, Rsvp};
 
-use chrono::{DateTime, Utc};
-use sqlx::{postgres::types::PgRange, types::Uuid, PgPool, Row};
+use sqlx::{types::Uuid, PgPool, Row};
 
 impl ReservationManager {
     pub fn new(pool: PgPool) -> Self {
@@ -16,7 +16,7 @@ impl Rsvp for ReservationManager {
     async fn reserve(&self, mut rsvp: abi::Reservation) -> Result<abi::Reservation, Error> {
         rsvp.validate()?;
 
-        let timespan: PgRange<DateTime<Utc>> = rsvp.get_timespan().into();
+        let timespan = rsvp.get_timespan();
 
         let status = abi::ReservationStatus::from_i32(rsvp.status)
             .unwrap_or(abi::ReservationStatus::Pending);
@@ -88,15 +88,41 @@ impl Rsvp for ReservationManager {
         Ok(rsvp)
     }
 
-    async fn query(&self, _query: abi::ReservationQuery) -> Result<Vec<abi::Reservation>, Error> {
-        todo!()
+    async fn query(&self, query: abi::ReservationQuery) -> Result<Vec<abi::Reservation>, Error> {
+        let user_id = string_to_opt(&query.user_id);
+        let resource_id = string_to_opt(&query.resource_id);
+        let range = query.get_timespan();
+        let status = abi::ReservationStatus::from_i32(query.status)
+            .unwrap_or(abi::ReservationStatus::Pending);
+
+        let rsvps = sqlx::query_as(
+            "SELECT * FROM rsvp.query($1, $2, $3, $4::rsvp.reservation_status, $5, $6, $7)",
+        )
+        .bind(user_id)
+        .bind(resource_id)
+        .bind(range)
+        .bind(status.to_string())
+        .bind(query.page)
+        .bind(query.desc)
+        .bind(query.page_size)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rsvps)
     }
 }
 
+fn string_to_opt(s: &str) -> Option<&str> {
+    if s.is_empty() {
+        None
+    } else {
+        Some(s)
+    }
+}
 #[cfg(test)]
 mod tests {
 
-    use abi::ReservationStatus;
+    use abi::{ReservationQuery, ReservationStatus};
 
     use super::*;
 
@@ -192,6 +218,29 @@ mod tests {
         let rsvp1 = manager.get(rsvp.id.clone()).await?;
 
         assert_eq!(rsvp, rsvp1);
+
+        Ok(())
+    }
+
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn query_reservations_should_work() -> Result<(), Error> {
+        let (rsvp, manager) = make_james_reservation(&migrated_pool).await;
+
+        let query = ReservationQuery::new(
+            "james id",
+            "Ocean view room 5018",
+            "2022-11-25T15:00:00-0700".parse().unwrap(),
+            "2022-12-31T00:00:00-0700".parse().unwrap(),
+            ReservationStatus::Pending,
+            1,
+            10,
+            false,
+        );
+
+        let rsvps = manager.query(query).await?;
+
+        assert_eq!(rsvps.len(), 1);
+        assert_eq!(rsvps[0], rsvp);
 
         Ok(())
     }
