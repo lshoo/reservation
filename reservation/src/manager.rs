@@ -122,7 +122,8 @@ fn string_to_opt(s: &str) -> Option<&str> {
 #[cfg(test)]
 mod tests {
 
-    use abi::{ReservationQuery, ReservationStatus};
+    use abi::{ReservationQueryBuilder, ReservationStatus};
+    use prost_types::Timestamp;
 
     use super::*;
 
@@ -226,21 +227,35 @@ mod tests {
     async fn query_reservations_should_work() -> Result<(), Error> {
         let (rsvp, manager) = make_james_reservation(&migrated_pool).await;
 
-        let query = ReservationQuery::new(
-            "james id",
-            "Ocean view room 5018",
-            "2022-11-25T15:00:00-0700".parse().unwrap(),
-            "2022-12-31T00:00:00-0700".parse().unwrap(),
-            ReservationStatus::Pending,
-            1,
-            10,
-            false,
-        );
+        let query = ReservationQueryBuilder::default()
+            .user_id("james id")
+            .start("2022-10-25T15:00:00-0700".parse::<Timestamp>().unwrap())
+            .end("2022-12-31T00:00:00-0700".parse::<Timestamp>().unwrap())
+            .status(ReservationStatus::Pending)
+            .build()
+            .unwrap();
 
         let rsvps = manager.query(query).await?;
 
         assert_eq!(rsvps.len(), 1);
         assert_eq!(rsvps[0], rsvp);
+
+        let query = ReservationQueryBuilder::default()
+            .user_id("james id")
+            .start("2022-10-25T15:00:00-0700".parse::<Timestamp>().unwrap())
+            .end("2022-12-31T00:00:00-0700".parse::<Timestamp>().unwrap())
+            .status(ReservationStatus::Confirmed)
+            .build()
+            .unwrap();
+
+        let rsvps = manager.query(query.clone()).await?;
+
+        assert_eq!(rsvps.len(), 0);
+
+        let _rsvp = manager.change_status(rsvp.id).await?;
+        let rsvps = manager.query(query).await?;
+
+        assert_eq!(rsvps.len(), 1);
 
         Ok(())
     }
