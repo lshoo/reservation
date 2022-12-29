@@ -4,9 +4,7 @@ use abi::Error;
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-pub type ReservationId = String;
-pub type UserId = String;
-pub type ResourceId = String;
+use abi::ReservationId;
 
 #[async_trait]
 pub trait Rsvp {

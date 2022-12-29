@@ -1,8 +1,8 @@
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Reservation {
-    #[prost(string, tag = "1")]
-    pub id: ::prost::alloc::string::String,
+    #[prost(int64, tag = "1")]
+    pub id: i64,
     #[prost(string, tag = "2")]
     pub user_id: ::prost::alloc::string::String,
     #[prost(enumeration = "ReservationStatus", tag = "3")]

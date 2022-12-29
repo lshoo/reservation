@@ -20,7 +20,7 @@ pub enum Error {
     InvalidTime,
 
     #[error("invalid reservation id {0}")]
-    InvalidReservationId(String),
+    InvalidReservationId(i64),
 
     #[error("invalid user id {0}")]
     InvalidUserId(String),
