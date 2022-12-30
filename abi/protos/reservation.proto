@@ -91,6 +91,37 @@ message QueryRequest {
     ReservationQuery query = 1;
 }
 
+// query reservations, order by id
+message ReservationFilter {
+    // resource id for the reservation query, If empty, query all reservations
+    string resource_id = 1;
+    // user id for the reservation query, if empty, query all reservations
+    string user_id = 2;
+    // use status to filter result. If UNKNOWN, return all reservations
+    ReservationStatus status = 3;
+    // cursor
+    int64 cursor = 4;
+    // page size for the query
+    int32 page_size = 65;
+    // sort direction
+    bool desc = 6;
+}
+
+message FilterRequest {
+    ReservationFilter filter = 1;
+}
+
+message FilterPager {
+    int64 prev = 1;
+    int64 next = 2;
+    int32 total = 3;
+}
+
+message FilterResponse {
+    repeated Reservation reservations = 1;
+    FilterPager pager = 2;
+}
+
 message ListenRequest {}
 message ListenResponse {
     ReservationUpdateType op = 1;
@@ -104,6 +135,7 @@ service ReservationService {
     rpc cancel(CancelRequest) returns (CancelResponse);
     rpc get(GetRequest) returns (GetResponse);
     rpc query(QueryRequest) returns (stream Reservation);
+    rpc filter(ReservationFilter) returns (FilterResponse);
 
     // another system could monitor newly added/confirmed/canceled reservation
     rpc listen(ListenRequest) returns (stream Reservation);

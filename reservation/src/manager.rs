@@ -110,6 +110,62 @@ impl Rsvp for ReservationManager {
 
         Ok(rsvps)
     }
+
+    async fn filter(
+        &self,
+        filter: abi::ReservationFilter,
+    ) -> Result<(abi::FilterPager, Vec<abi::Reservation>), Error> {
+        // filter reservation by user_id, resource_id, status, and order by id
+        let user_id = string_to_opt(&filter.user_id);
+        let resource_id = string_to_opt(&filter.resource_id);
+        let status = abi::ReservationStatus::from_i32(filter.status)
+            .unwrap_or(abi::ReservationStatus::Pending);
+        let page_size = if filter.page_size < 10 || filter.page_size > 100 {
+            10
+        } else {
+            filter.page_size
+        };
+
+        let rsvps: Vec<abi::Reservation> = sqlx::query_as(
+            "SELECT * FROM rsvp.filter($1, $2, $3::rsvp.reservation_status, $4, $5, $6)",
+        )
+        .bind(user_id)
+        .bind(resource_id)
+        .bind(status.to_string())
+        .bind(filter.cursor)
+        .bind(filter.desc)
+        .bind(page_size)
+        .fetch_all(&self.pool)
+        .await?;
+
+        // if the first id is current cursor, then we have prev, we start from 1
+        // if len - start > page_size, then we have next, we end at len - 1.
+        let has_prev = !rsvps.is_empty() && rsvps[0].id == filter.cursor;
+        let start = usize::from(has_prev);
+
+        let has_next = (rsvps.len() - start) as i32 > page_size;
+        let end = if has_next {
+            rsvps.len() - 1
+        } else {
+            rsvps.len()
+        };
+
+        let prev = if start == 1 { rsvps[start].id } else { -1 };
+        let next = if end == rsvps.len() - 1 {
+            rsvps[end].id
+        } else {
+            -1
+        };
+
+        let pager = abi::FilterPager {
+            prev,
+            next,
+            // TODO how to get total efficiently?
+            total: 0,
+        };
+
+        Ok((pager, rsvps))
+    }
 }
 
 fn string_to_opt(s: &str) -> Option<&str> {
@@ -122,7 +178,7 @@ fn string_to_opt(s: &str) -> Option<&str> {
 #[cfg(test)]
 mod tests {
 
-    use abi::{ReservationQueryBuilder, ReservationStatus};
+    use abi::{ReservationFilterBuilder, ReservationQueryBuilder, ReservationStatus};
     use prost_types::Timestamp;
 
     use super::*;
@@ -255,6 +311,25 @@ mod tests {
         let _rsvp = manager.change_status(rsvp.id).await?;
         let rsvps = manager.query(query).await?;
 
+        assert_eq!(rsvps.len(), 1);
+
+        Ok(())
+    }
+
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn filter_reservations_should_work() -> Result<(), Error> {
+        let (_rsvp, manager) = make_james_reservation(&migrated_pool).await;
+
+        let filter = ReservationFilterBuilder::default()
+            .user_id("james id")
+            .status(ReservationStatus::Pending)
+            .build()
+            .unwrap();
+
+        let (pager, rsvps) = manager.filter(filter).await.unwrap();
+
+        assert_eq!(pager.prev, -1);
+        assert_eq!(pager.next, -1);
         assert_eq!(rsvps.len(), 1);
 
         Ok(())
