@@ -1,13 +1,23 @@
-use abi::Validator;
+use abi::{DbConfig, Validator};
 use async_trait::async_trait;
 
 use crate::{Error, ReservationId, ReservationManager, Rsvp};
 
-use sqlx::{PgPool, Row};
+use sqlx::{postgres::PgPoolOptions, PgPool, Row};
 
 impl ReservationManager {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+
+    pub async fn from_config(config: &DbConfig) -> Result<Self, abi::Error> {
+        let url = config.get_url();
+        let pool = PgPoolOptions::default()
+            .max_connections(config.max_connections)
+            .connect(&url)
+            .await?;
+
+        Ok(Self::new(pool))
     }
 }
 

@@ -6,11 +6,15 @@ use sqlx::postgres::types::PgRange;
 
 use crate::{convert_to_utc_time, Error};
 
+mod config;
+
 mod reservation;
 
 mod reservation_query;
 
 mod reservation_status;
+
+pub use config::*;
 
 pub fn validate_range(start: Option<&Timestamp>, end: Option<&Timestamp>) -> Result<(), Error> {
     if start.is_none() || end.is_none() {

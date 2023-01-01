@@ -5,6 +5,7 @@ mod utils;
 
 pub use error::Error;
 pub use pb::*;
+pub use types::*;
 pub use utils::*;
 
 pub type ReservationId = i64;
