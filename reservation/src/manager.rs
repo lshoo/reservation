@@ -11,7 +11,7 @@ impl ReservationManager {
     }
 
     pub async fn from_config(config: &DbConfig) -> Result<Self, abi::Error> {
-        let url = config.get_url();
+        let url = config.url();
         let pool = PgPoolOptions::default()
             .max_connections(config.max_connections)
             .connect(&url)

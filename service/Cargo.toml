@@ -15,3 +15,7 @@ serde_yaml = "0.9.16"
 shellexpand = "3.0.0"
 tokio = { version = "1.23.0", features = ["full"] }
 tonic = { version = "0.8.3", features = ["tokio-rustls", "gzip"] }
+
+[dev-dependencies]
+lazy_static = "1.4.0"
+sqlx = { version = "0.6.2", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono"] }

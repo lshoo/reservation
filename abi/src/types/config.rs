@@ -39,13 +39,17 @@ impl Config {
 }
 
 impl DbConfig {
-    pub fn get_url(&self) -> String {
+    pub fn url(&self) -> String {
+        format!("{}/{}", self.server_url(), self.dbname)
+    }
+
+    pub fn server_url(&self) -> String {
         if self.password.is_empty() {
-            format!("postgres://{}@{}/{}", self.user, self.host, self.dbname,)
+            format!("postgres://{}@{}:{}", self.user, self.host, self.port,)
         } else {
             format!(
-                "postgres://{}:{}@{}/{}",
-                self.user, self.password, self.host, self.dbname,
+                "postgres://{}:{}@{}:{}",
+                self.user, self.password, self.host, self.port,
             )
         }
     }
