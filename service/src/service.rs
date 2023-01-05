@@ -38,27 +38,43 @@ impl ReservationService for RsvpService {
 
     async fn confirm(
         &self,
-        _request: Request<ConfirmRequest>,
+        request: Request<ConfirmRequest>,
     ) -> Result<Response<ConfirmResponse>, Status> {
-        todo!()
+        let request = request.into_inner();
+        let reservation = self.manager.change_status(request.id).await?;
+        Ok(Response::new(ConfirmResponse {
+            reservation: Some(reservation),
+        }))
     }
 
     async fn update(
         &self,
-        _request: Request<UpdateRequest>,
+        request: Request<UpdateRequest>,
     ) -> Result<Response<UpdateResponse>, Status> {
-        todo!()
+        let request = request.into_inner();
+        let reservation = self.manager.update_note(request.id, request.note).await?;
+        Ok(Response::new(UpdateResponse {
+            reservation: Some(reservation),
+        }))
     }
 
     async fn cancel(
         &self,
-        _request: Request<CancelRequest>,
+        request: Request<CancelRequest>,
     ) -> Result<Response<CancelResponse>, Status> {
-        todo!()
+        let request = request.into_inner();
+        let reservation = self.manager.delete(request.id).await?;
+        Ok(Response::new(CancelResponse {
+            reservation: Some(reservation),
+        }))
     }
 
-    async fn get(&self, _request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
-        todo!()
+    async fn get(&self, request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
+        let request = request.into_inner();
+        let reservation = self.manager.get(request.id).await?;
+        Ok(Response::new(GetResponse {
+            reservation: Some(reservation),
+        }))
     }
 
     /// Server streaming response type for the query method.

@@ -20,7 +20,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: resservation
+          POSTGRES_DB: reservation
         ports:
           - 5432:5432
         # Set health checks to wait until postgres has started

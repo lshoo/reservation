@@ -77,14 +77,14 @@ impl Rsvp for ReservationManager {
         Ok(rsvp)
     }
 
-    async fn delete(&self, id: ReservationId) -> Result<(), Error> {
+    async fn delete(&self, id: ReservationId) -> Result<abi::Reservation, Error> {
         id.validate()?;
-        sqlx::query("DELETE FROM rsvp.reservations WHERE id = $1 ")
+        let rsvp = sqlx::query_as("DELETE FROM rsvp.reservations WHERE id = $1 RETURNING *")
             .bind(id)
-            .execute(&self.pool)
+            .fetch_one(&self.pool)
             .await?;
 
-        Ok(())
+        Ok(rsvp)
     }
 
     async fn get(&self, id: ReservationId) -> Result<abi::Reservation, Error> {
