@@ -16,11 +16,11 @@ jobs:
     runs-on: ${{ matrix.platform }}
     services:
       postgres:
-        image: postgres:14.5
+        image: postgres:14.6
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test
+          POSTGRES_DB: resservation
         ports:
           - 5432:5432
         # Set health checks to wait until postgres has started
