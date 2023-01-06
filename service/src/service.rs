@@ -1,20 +1,45 @@
-use abi::{
-    reservation_service_server::ReservationService, CancelRequest, CancelResponse, Config,
-    ConfirmRequest, ConfirmResponse, Error, FilterResponse, GetRequest, GetResponse, ListenRequest,
-    QueryRequest, ReservationFilter, ReserveRequest, ReserveResponse, UpdateRequest,
-    UpdateResponse,
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
 };
 
+use abi::{
+    reservation_service_server::ReservationService, CancelRequest, CancelResponse, Config,
+    ConfirmRequest, ConfirmResponse, Error, FilterRequest, FilterResponse, GetRequest, GetResponse,
+    ListenRequest, QueryRequest, ReserveRequest, ReserveResponse, UpdateRequest, UpdateResponse,
+};
+
+use futures::Stream;
 use reservation::{ReservationManager, Rsvp};
+use tokio::sync::mpsc;
 use tonic::{async_trait, Request, Response, Status};
 
-use crate::{ReservationStream, RsvpService};
+use crate::{ReservationStream, RsvpService, TonicReceiverStream};
 
 impl RsvpService {
     pub async fn from_config(config: &Config) -> Result<Self, Error> {
         ReservationManager::from_config(&config.db)
             .await
             .map(|m| RsvpService { manager: m })
+    }
+}
+
+impl<T> Stream for TonicReceiverStream<T> {
+    type Item = Result<T, Status>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        match self.inner.poll_recv(cx) {
+            Poll::Ready(Some(Ok(item))) => Poll::Ready(Some(Ok(item))),
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e.into()))),
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+impl<T> TonicReceiverStream<T> {
+    pub fn new(inner: mpsc::Receiver<Result<T, Error>>) -> Self {
+        Self { inner }
     }
 }
 
@@ -85,16 +110,35 @@ impl ReservationService for RsvpService {
 
     async fn query(
         &self,
-        _request: Request<QueryRequest>,
+        request: Request<QueryRequest>,
     ) -> Result<Response<Self::queryStream>, Status> {
-        todo!()
+        let request = request.into_inner();
+
+        if request.query.is_none() {
+            return Err(Status::invalid_argument("missing filter params"));
+        }
+
+        let rx = self.manager.query(request.query.unwrap()).await;
+        let stream = TonicReceiverStream::new(rx);
+
+        Ok(Response::new(Box::pin(stream)))
     }
 
     async fn filter(
         &self,
-        _request: Request<ReservationFilter>,
+        request: Request<FilterRequest>,
     ) -> Result<Response<FilterResponse>, Status> {
-        todo!()
+        let request = request.into_inner();
+
+        if request.filter.is_none() {
+            return Err(Status::invalid_argument("missing filter params"));
+        }
+
+        let (pager, rsvps) = self.manager.filter(request.filter.unwrap()).await?;
+        Ok(Response::new(FilterResponse {
+            pager: Some(pager),
+            reservations: rsvps,
+        }))
     }
 
     /// Server streaming response type for the listen method.

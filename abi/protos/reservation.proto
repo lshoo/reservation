@@ -136,7 +136,7 @@ service ReservationService {
     rpc cancel(CancelRequest) returns (CancelResponse);
     rpc get(GetRequest) returns (GetResponse);
     rpc query(QueryRequest) returns (stream Reservation);
-    rpc filter(ReservationFilter) returns (FilterResponse);
+    rpc filter(FilterRequest) returns (FilterResponse);
 
     // another system could monitor newly added/confirmed/canceled reservation
     rpc listen(ListenRequest) returns (stream Reservation);
