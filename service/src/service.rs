@@ -159,40 +159,13 @@ impl ReservationService for RsvpService {
 #[cfg(test)]
 mod tests {
 
-    use abi::Reservation;
-    use sqlx_postgres_tester::TestPg;
-    use std::ops::Deref;
-
     use super::*;
-
-    struct TestConfig {
-        #[allow(dead_code)]
-        tdb: TestPg,
-        config: Config,
-    }
-
-    impl TestConfig {
-        pub fn new() -> Self {
-            let mut config = Config::load("../service/fixtures/config.yml").unwrap();
-            let tdb = TestPg::new(config.db.server_url(), "../migrations");
-
-            config.db.dbname = tdb.dbname.clone();
-
-            Self { tdb, config }
-        }
-    }
-
-    impl Deref for TestConfig {
-        type Target = Config;
-
-        fn deref(&self) -> &Self::Target {
-            &self.config
-        }
-    }
+    use crate::test_utils::TestConfig;
+    use abi::Reservation;
 
     #[tokio::test]
     async fn rpc_reserve_should_work() {
-        let config = TestConfig::new();
+        let config = TestConfig::default();
         let service = RsvpService::from_config(&config).await.unwrap();
         let reservation = Reservation::new_pending(
             "james id",

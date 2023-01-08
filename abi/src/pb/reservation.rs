@@ -95,19 +95,19 @@ pub struct ReservationQuery {
     #[builder(setter(into), default)]
     pub status: i32,
     #[prost(message, optional, tag = "4")]
-    #[builder(setter(into, strip_option))]
+    #[builder(setter(into, strip_option), default)]
     pub start: ::core::option::Option<::prost_types::Timestamp>,
     #[prost(message, optional, tag = "5")]
-    #[builder(setter(into, strip_option))]
+    #[builder(setter(into, strip_option), default)]
     pub end: ::core::option::Option<::prost_types::Timestamp>,
     /// current page for query
     #[prost(int32, tag = "6")]
     #[builder(setter(into), default)]
     pub page: i32,
     /// page size for the query
-    #[prost(int32, tag = "7")]
-    #[builder(setter(into), default)]
-    pub page_size: i32,
+    #[prost(int64, tag = "7")]
+    #[builder(setter(into), default = "10")]
+    pub page_size: i64,
     /// sort direction
     #[prost(bool, tag = "8")]
     #[builder(setter(into), default)]
@@ -138,12 +138,12 @@ pub struct ReservationFilter {
     pub status: i32,
     /// cursor
     #[prost(int64, tag = "4")]
-    #[builder(setter(into), default)]
+    #[builder(setter(into, strip_option), default)]
     pub cursor: i64,
     /// page size for the query
-    #[prost(int32, tag = "65")]
-    #[builder(setter(into), default)]
-    pub page_size: i32,
+    #[prost(int64, tag = "65")]
+    #[builder(setter(into), default = "10")]
+    pub page_size: i64,
     /// sort direction
     #[prost(bool, tag = "6")]
     #[builder(setter(into), default)]
@@ -162,8 +162,8 @@ pub struct FilterPager {
     pub prev: i64,
     #[prost(int64, tag = "2")]
     pub next: i64,
-    #[prost(int32, tag = "3")]
-    pub total: i32,
+    #[prost(int64, tag = "3")]
+    pub total: i64,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

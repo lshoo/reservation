@@ -1,6 +1,6 @@
 use abi::{DbConfig, Validator};
 use async_trait::async_trait;
-use tracing::{info, warn};
+use tracing::{info, trace, warn};
 
 use crate::{Error, ReservationId, ReservationManager, Rsvp};
 use futures::StreamExt;
@@ -183,12 +183,14 @@ impl Rsvp for ReservationManager {
         let has_prev = !rsvps.is_empty() && rsvps[0].id == filter.cursor;
         let start = usize::from(has_prev);
 
-        let has_next = (rsvps.len() - start) as i32 > page_size;
+        let has_next = (rsvps.len() - start) as i64 > page_size;
         let end = if has_next {
             rsvps.len() - 1
         } else {
             rsvps.len()
         };
+
+        trace!("start: {}, rsvp lens: {}, end: {}", start, rsvps.len(), end);
 
         let prev = if start == 1 { rsvps[start].id } else { -1 };
         let next = if end == rsvps.len() - 1 {
