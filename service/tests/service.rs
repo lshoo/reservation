@@ -4,25 +4,18 @@ use std::time::Duration;
 
 use abi::{
     reservation_service_client::ReservationServiceClient, ConfirmRequest, FilterRequest,
-    FilterResponse, Reservation, ReservationFilterBuilder, ReservationStatus, ReserveRequest,
+    FilterResponse, QueryRequest, Reservation, ReservationFilterBuilder, ReservationQueryBuilder,
+    ReservationStatus, ReserveRequest,
 };
+use futures::StreamExt;
 use reservation_service::start_server;
 use test_utils::TestConfig;
+use tonic::transport::Channel;
 
 #[tokio::test]
 async fn grpc_server_should_work() {
-    let tconfig = TestConfig::default();
-    let config = tconfig.config.clone();
-    let config_cloned = config.clone();
-    tokio::spawn(async move {
-        start_server(&config_cloned).await.unwrap();
-    });
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    println!("the server url: {:?}", config.server.url(false));
-    let mut client = ReservationServiceClient::connect(config.server.url(false))
-        .await
-        .unwrap();
+    let tconfig = TestConfig::with_server_port(50000);
+    let mut client = get_test_client(&tconfig).await;
 
     // first reservte a reservation
     let mut rsvp = Reservation::new_pending(
@@ -52,11 +45,8 @@ async fn grpc_server_should_work() {
         "test service in grpc2",
     );
     let ret2 = client.reserve(ReserveRequest::new(rsvp2)).await;
+
     assert!(ret2.is_err());
-    // assert_eq!(
-    //     ret2.unwrap_err().to_string(),
-    //     "rpc error: code = InvalidArgument desc ",
-    // );
 
     // then confirm the first reservation
     let ret3 = client
@@ -67,6 +57,35 @@ async fn grpc_server_should_work() {
         .reservation
         .unwrap();
     assert_eq!(ret3.status, ReservationStatus::Confirmed as i32);
+}
+
+#[tokio::test]
+async fn grpc_query_should_work() {
+    let tconfig = TestConfig::with_server_port(50002);
+    let mut client = get_test_client(&tconfig).await;
+
+    make_reservations(&mut client, 100).await;
+
+    let query = ReservationQueryBuilder::default()
+        .user_id("james id")
+        .build()
+        .unwrap();
+
+    let mut ret = client
+        .query(QueryRequest::new(query))
+        .await
+        .unwrap()
+        .into_inner();
+
+    while let Some(Ok(rsvp)) = ret.next().await {
+        assert_eq!(rsvp.user_id, "james id");
+    }
+}
+
+#[tokio::test]
+async fn grpc_filter_should_work() {
+    let tconfig = TestConfig::with_server_port(50001);
+    let mut client = get_test_client(&tconfig).await;
 
     // then make 100 reservations without confliction
     for i in 0..100 {
@@ -131,4 +150,40 @@ async fn grpc_server_should_work() {
     // assert_eq!(pager.prev, next_filter.cursor - 1);
 
     // assert_eq!(reservations.len(), filter.page_size as usize);
+}
+
+async fn get_test_client(tconfig: &TestConfig) -> ReservationServiceClient<Channel> {
+    let config = tconfig.config.clone();
+    let config_cloned = tconfig.config.clone();
+    tokio::spawn(async move {
+        start_server(&config_cloned).await.unwrap();
+    });
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    println!("the server url: {:?}", config.server.url(false));
+    ReservationServiceClient::connect(config.server.url(false))
+        .await
+        .unwrap()
+}
+
+async fn make_reservations(client: &mut ReservationServiceClient<Channel>, count: i32) {
+    for i in 0..count {
+        let mut rsvp = Reservation::new_pending(
+            "james id",
+            format!("Ocean view room {}", i),
+            "2022-12-25T15:00:00-0700".parse().unwrap(),
+            "2022-12-30T00:00:00-0700".parse().unwrap(),
+            format!("test service in grpc with id {}", i),
+        );
+
+        let ret = client
+            .reserve(ReserveRequest::new(rsvp.clone()))
+            .await
+            .unwrap()
+            .into_inner()
+            .reservation
+            .unwrap();
+        rsvp.id = ret.id;
+        assert_eq!(ret, rsvp);
+    }
 }

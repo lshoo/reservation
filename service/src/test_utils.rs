@@ -17,11 +17,17 @@ impl TestConfig {
 
         Self { tdb, config }
     }
+
+    pub fn with_server_port(port: u16) -> Self {
+        let mut config = TestConfig::default();
+        config.config.server.port = port;
+        config
+    }
 }
 
 impl Default for TestConfig {
     fn default() -> Self {
-        Self::new("../service/fixtures/config.yml")
+        Self::new("fixtures/config.yml")
     }
 }
 
