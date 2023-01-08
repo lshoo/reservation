@@ -3,13 +3,14 @@ mod test_utils;
 use std::time::Duration;
 
 use abi::{
-    reservation_service_client::ReservationServiceClient, ConfirmRequest, FilterRequest,
+    reservation_service_client::ReservationServiceClient, Config, ConfirmRequest, FilterRequest,
     FilterResponse, QueryRequest, Reservation, ReservationFilterBuilder, ReservationQueryBuilder,
     ReservationStatus, ReserveRequest,
 };
 use futures::StreamExt;
 use reservation_service::start_server;
 use test_utils::TestConfig;
+use tokio::time;
 use tonic::transport::Channel;
 
 #[tokio::test]
@@ -154,16 +155,34 @@ async fn grpc_filter_should_work() {
 
 async fn get_test_client(tconfig: &TestConfig) -> ReservationServiceClient<Channel> {
     let config = tconfig.config.clone();
-    let config_cloned = tconfig.config.clone();
-    tokio::spawn(async move {
-        start_server(&config_cloned).await.unwrap();
-    });
+    setup_server(&config);
+
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     println!("the server url: {:?}", config.server.url(false));
-    ReservationServiceClient::connect(config.server.url(false))
-        .await
-        .unwrap()
+
+    let fut = async move {
+        // if error on conn keep retry until timeout
+        while ReservationServiceClient::connect(config.server.url(false))
+            .await
+            .is_err()
+        {
+            time::sleep(Duration::from_millis(10)).await;
+        }
+
+        ReservationServiceClient::connect(config.server.url(false))
+            .await
+            .unwrap()
+    };
+
+    time::timeout(Duration::from_secs(5), fut).await.unwrap()
+}
+
+fn setup_server(config: &Config) {
+    let config_cloned = config.clone();
+    tokio::spawn(async move {
+        start_server(&config_cloned).await.unwrap();
+    });
 }
 
 async fn make_reservations(client: &mut ReservationServiceClient<Channel>, count: i32) {
