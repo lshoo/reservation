@@ -3,6 +3,9 @@ use std::process::Command;
 use proto_builder_trait::tonic::BuilderAttributes;
 
 fn main() {
+    let mut config = prost_build::Config::new();
+    config.protoc_arg("--experimental_allow_proto3_optional");
+
     tonic_build::configure()
         .out_dir("src/pb")
         .with_sqlx_type(&["reservation.ReservationStatus"])
@@ -12,19 +15,24 @@ fn main() {
         ])
         .with_derive_builder_into(
             "reservation.ReservationQuery",
-            &["resource_id", "user_id", "status", "page", "desc"],
+            &["resource_id", "user_id", "status", "desc"],
         )
         .with_derive_builder_into(
             "reservation.ReservationFilter",
-            &["resource_id", "user_id", "status", "page", "desc"],
+            &["resource_id", "user_id", "status", "desc"],
         )
         .with_derive_builder_option("reservation.ReservationFilter", &["cursor"])
         .with_derive_builder_option("reservation.ReservationQuery", &["start", "end"])
+        .with_type_attributes(
+            &["reservation.ReservationFilter"],
+            &[r#"#[builder(build_fn(name = "private_build"))]"#],
+        )
         .with_field_attributes(
             &["page_size"],
             &["#[builder(setter(into), default = \"10\")]"],
         )
-        .compile(&["protos/reservation.proto"], &["protos"])
+        .compile_with_config(config, &["protos/reservation.proto"], &["protos"])
+        // .compile(&["protos/reservation.proto"], &["protos"])
         .unwrap();
 
     Command::new("cargo").args(["fmt"]).output().unwrap();

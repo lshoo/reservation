@@ -88,26 +88,7 @@ async fn grpc_filter_should_work() {
     let tconfig = TestConfig::with_server_port(50001);
     let mut client = get_test_client(&tconfig).await;
 
-    // then make 100 reservations without confliction
-    for i in 0..100 {
-        let mut rsvp = Reservation::new_pending(
-            "james id",
-            format!("Ocean view room {}", i),
-            "2022-12-25T15:00:00-0700".parse().unwrap(),
-            "2022-12-30T00:00:00-0700".parse().unwrap(),
-            format!("test service in grpc with id {}", i),
-        );
-
-        let ret = client
-            .reserve(ReserveRequest::new(rsvp.clone()))
-            .await
-            .unwrap()
-            .into_inner()
-            .reservation
-            .unwrap();
-        rsvp.id = ret.id;
-        assert_eq!(ret, rsvp);
-    }
+    make_reservations(&mut client, 25).await;
 
     // then filter by user
     let filter = ReservationFilterBuilder::default()
@@ -126,13 +107,14 @@ async fn grpc_filter_should_work() {
 
     let pager = pager.unwrap();
 
-    // assert_eq!(pager.next, filter.page_size + 1 );
-    assert_eq!(pager.prev, -1);
+    assert_eq!(pager.next, Some(filter.page_size + 1));
+    assert_eq!(pager.prev, None);
+    assert_eq!(pager.total, None);
 
     println!("rsvps lens: {}", reservations.len());
-    // assert_eq!(reservations.len(), filter.page_size as usize);
+    assert_eq!(reservations.len(), filter.page_size as usize);
 
-    // // then get next page
+    // then get next page
     // let mut next_filter = filter.clone();
     // next_filter.cursor = pager.next;
 
@@ -147,8 +129,8 @@ async fn grpc_filter_should_work() {
 
     // let pager = pager.unwrap();
 
-    // assert_eq!(pager.next, next_filter.cursor + filter.page_size);
-    // assert_eq!(pager.prev, next_filter.cursor - 1);
+    // assert_eq!(pager.next, filter.cursor.map(|v| v + filter.page_size));
+    // assert_eq!(pager.prev, filter.cursor.map(|v| v + 1));
 
     // assert_eq!(reservations.len(), filter.page_size as usize);
 }
