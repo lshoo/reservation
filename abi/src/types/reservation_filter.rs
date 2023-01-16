@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
 
 use crate::{
-    Error, FilterPager, Normalize, Reservation, ReservationFilter, ReservationFilterBuilder,
-    ReservationStatus, ToSql, Validator,
+    pager::PageInfo, Error, FilterPager, Normalize, Reservation, ReservationFilter,
+    ReservationFilterBuilder, ReservationStatus, ToSql, Validator,
 };
 
 impl ReservationFilterBuilder {
@@ -105,6 +105,14 @@ impl ReservationFilter {
         };
 
         Ok(pager)
+    }
+
+    pub fn get_page_info(&self) -> PageInfo {
+        PageInfo {
+            cursor: self.cursor,
+            page_size: self.page_size,
+            desc: self.desc,
+        }
     }
 }
 

@@ -1,3 +1,4 @@
+pub mod pager;
 mod request;
 mod reservation;
 mod reservation_filter;
