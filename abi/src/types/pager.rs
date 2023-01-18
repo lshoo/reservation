@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
 
+use crate::FilterPager;
+
 pub struct PageInfo {
     pub cursor: Option<i64>,
     pub page_size: i64,
@@ -10,6 +12,26 @@ pub struct Pager {
     pub prev: Option<i64>,
     pub next: Option<i64>,
     pub total: Option<i64>,
+}
+
+impl From<Pager> for FilterPager {
+    fn from(value: Pager) -> Self {
+        Self {
+            prev: value.prev,
+            next: value.next,
+            total: value.total,
+        }
+    }
+}
+
+impl From<&FilterPager> for Pager {
+    fn from(value: &FilterPager) -> Self {
+        Self {
+            prev: value.prev,
+            next: value.next,
+            total: value.total,
+        }
+    }
 }
 
 pub trait Paginator: Sized {

@@ -165,7 +165,7 @@ impl Rsvp for ReservationManager {
 
         let mut rsvps: VecDeque<abi::Reservation> = rsvps.into_iter().collect();
 
-        let pager = filter.get_pager(&mut rsvps)?;
+        let pager = filter.get_pager(&mut rsvps);
 
         Ok((pager, rsvps.into_iter().collect()))
     }

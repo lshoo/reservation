@@ -88,7 +88,7 @@ async fn grpc_filter_should_work() {
     let tconfig = TestConfig::with_server_port(50001);
     let mut client = get_test_client(&tconfig).await;
 
-    make_reservations(&mut client, 25).await;
+    make_reservations(&mut client, 29).await;
 
     // then filter by user
     let filter = ReservationFilterBuilder::default()
@@ -107,7 +107,7 @@ async fn grpc_filter_should_work() {
 
     let pager = pager.unwrap();
 
-    assert_eq!(pager.next, Some(filter.page_size + 1));
+    assert_eq!(pager.next, Some(filter.page_size));
     assert_eq!(pager.prev, None);
     assert_eq!(pager.total, None);
 
@@ -115,24 +115,41 @@ async fn grpc_filter_should_work() {
     assert_eq!(reservations.len(), filter.page_size as usize);
 
     // then get next page
-    // let mut next_filter = filter.clone();
-    // next_filter.cursor = pager.next;
+    let filter = filter.next_page(&pager).unwrap();
 
-    // let FilterResponse {
-    //     pager,
-    //     reservations,
-    // } = client
-    //     .filter(FilterRequest::new(next_filter.clone()))
-    //     .await
-    //     .unwrap()
-    //     .into_inner();
+    let FilterResponse {
+        pager,
+        reservations,
+    } = client
+        .filter(FilterRequest::new(filter.clone()))
+        .await
+        .unwrap()
+        .into_inner();
 
-    // let pager = pager.unwrap();
+    let pager = pager.unwrap();
 
-    // assert_eq!(pager.next, filter.cursor.map(|v| v + filter.page_size));
-    // assert_eq!(pager.prev, filter.cursor.map(|v| v + 1));
+    assert_eq!(pager.next, filter.cursor.map(|v| v + filter.page_size));
+    assert_eq!(pager.prev, filter.cursor.map(|v| v + 1));
 
-    // assert_eq!(reservations.len(), filter.page_size as usize);
+    assert_eq!(reservations.len(), filter.page_size as usize);
+
+    // then get next page (last page)
+    let filter = filter.next_page(&pager).unwrap();
+    let FilterResponse {
+        pager,
+        reservations,
+    } = client
+        .filter(FilterRequest::new(filter.clone()))
+        .await
+        .unwrap()
+        .into_inner();
+
+    let pager = pager.unwrap();
+
+    assert_eq!(pager.next, None);
+    assert_eq!(pager.prev, filter.cursor.map(|v| v + 1));
+
+    assert_eq!(reservations.len(), 9);
 }
 
 async fn get_test_client(tconfig: &TestConfig) -> ReservationServiceClient<Channel> {
