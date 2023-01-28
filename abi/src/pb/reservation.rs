@@ -81,6 +81,7 @@ pub struct GetResponse {
     pub reservation: ::core::option::Option<Reservation>,
 }
 #[derive(derive_builder::Builder)]
+#[builder(build_fn(name = "private_build"))]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ReservationQuery {

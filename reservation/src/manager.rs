@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use abi::{convert_to_utc_time, DbConfig, Normalize, ToSql, Validator};
+use abi::{DbConfig, Normalize, ToSql, Validator};
 use async_trait::async_trait;
 use tracing::{info, warn};
 
@@ -106,27 +106,12 @@ impl Rsvp for ReservationManager {
         &self,
         query: abi::ReservationQuery,
     ) -> mpsc::Receiver<Result<abi::Reservation, Error>> {
-        let user_id = string_to_opt(&query.user_id);
-        let resource_id = string_to_opt(&query.resource_id);
-        let start = query.start.map(convert_to_utc_time);
-        let end = query.end.map(convert_to_utc_time);
-        let status = abi::ReservationStatus::from_i32(query.status)
-            .unwrap_or(abi::ReservationStatus::Pending);
-
         let pool = self.pool.clone();
-
         let (tx, rx) = mpsc::channel(128);
+
         tokio::spawn(async move {
-            let mut rsvps = sqlx::query_as(
-                "SELECT * FROM rsvp.query($1, $2, $3, $4, $5::rsvp.reservation_status, $6)",
-            )
-            .bind(user_id)
-            .bind(resource_id)
-            .bind(start)
-            .bind(end)
-            .bind(status.to_string())
-            .bind(query.desc)
-            .fetch_many(&pool);
+            let sql = query.to_sql();
+            let mut rsvps = sqlx::query_as(&sql).fetch_many(&pool);
 
             while let Some(ret) = rsvps.next().await {
                 match ret {
@@ -159,7 +144,7 @@ impl Rsvp for ReservationManager {
     ) -> Result<(abi::FilterPager, Vec<abi::Reservation>), Error> {
         filter.normalize()?;
 
-        let sql = filter.to_sql()?;
+        let sql = filter.to_sql();
 
         let rsvps: Vec<abi::Reservation> = sqlx::query_as(&sql).fetch_all(&self.pool).await?;
 
@@ -171,33 +156,30 @@ impl Rsvp for ReservationManager {
     }
 }
 
-fn string_to_opt(s: &str) -> Option<String> {
-    if s.is_empty() {
-        None
-    } else {
-        Some(s.into())
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
+    use super::*;
     use abi::{ReservationFilterBuilder, ReservationQueryBuilder, ReservationStatus};
     use prost_types::Timestamp;
 
-    use super::*;
+    use sqlx_postgres_tester::TestPg;
 
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn reserve_should_work_for_valid_window() -> Result<(), Error> {
-        let (rsvp, _) = make_james_reservation(&migrated_pool).await;
+        let tdb = get_tdb();
+        let pool = tdb.get_pool().await;
+        let (rsvp, _) = make_james_reservation(&pool).await;
         assert_ne!(rsvp.id, 0);
 
         Ok(())
     }
 
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn reserve_conflict_reservation_should_rejected() -> Result<(), Error> {
-        let (_rsvp1, manager) = make_james_reservation(&migrated_pool).await;
+        let tdb = get_tdb();
+        let pool = tdb.get_pool().await;
+        let (_rsvp1, manager) = make_james_reservation(&pool).await;
 
         let rsvp2 = abi::Reservation::new_pending(
             "alice id",
@@ -220,9 +202,11 @@ mod tests {
         Ok(())
     }
 
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn change_status_should_work() -> Result<(), Error> {
-        let (rsvp, manager) = make_alice_reservation(&migrated_pool).await;
+        let tdb = get_tdb();
+        let pool = tdb.get_pool().await;
+        let (rsvp, manager) = make_alice_reservation(&pool).await;
 
         let rsvp = manager.change_status(rsvp.id).await?;
 
@@ -231,9 +215,11 @@ mod tests {
         Ok(())
     }
 
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn change_status_not_pending_should_do_nothing() -> Result<(), Error> {
-        let (rsvp, manager) = make_alice_reservation(&migrated_pool).await;
+        let tdb = get_tdb();
+        let pool = tdb.get_pool().await;
+        let (rsvp, manager) = make_alice_reservation(&pool).await;
 
         let rsvp = manager.change_status(rsvp.id).await?;
 
@@ -246,9 +232,11 @@ mod tests {
         Ok(())
     }
 
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn update_note_should_work() -> Result<(), Error> {
-        let (rsvp, manager) = make_alice_reservation(&migrated_pool).await;
+        let tdb = get_tdb();
+        let pool = tdb.get_pool().await;
+        let (rsvp, manager) = make_alice_reservation(&pool).await;
 
         let rsvp = manager.update_note(rsvp.id, "007".into()).await?;
 
@@ -257,9 +245,11 @@ mod tests {
         Ok(())
     }
 
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn delete_reservation_should_work() -> Result<(), Error> {
-        let (rsvp, manager) = make_alice_reservation(&migrated_pool).await;
+        let tdb = get_tdb();
+        let pool = tdb.get_pool().await;
+        let (rsvp, manager) = make_alice_reservation(&pool).await;
 
         manager.delete(rsvp.id).await?;
 
@@ -272,9 +262,11 @@ mod tests {
         Ok(())
     }
 
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn get_reservation_should_work() -> Result<(), Error> {
-        let (rsvp, manager) = make_alice_reservation(&migrated_pool).await;
+        let tdb = get_tdb();
+        let pool = tdb.get_pool().await;
+        let (rsvp, manager) = make_alice_reservation(&pool).await;
 
         let rsvp1 = manager.get(rsvp.id).await?;
 
@@ -283,9 +275,11 @@ mod tests {
         Ok(())
     }
 
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn query_reservations_should_work() -> Result<(), Error> {
-        let (rsvp, manager) = make_james_reservation(&migrated_pool).await;
+        let tdb = get_tdb();
+        let pool = tdb.get_pool().await;
+        let (rsvp, manager) = make_james_reservation(&pool).await;
 
         let query = ReservationQueryBuilder::default()
             .user_id("james id")
@@ -320,9 +314,11 @@ mod tests {
         Ok(())
     }
 
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn filter_reservations_should_work() -> Result<(), Error> {
-        let (_rsvp, manager) = make_james_reservation(&migrated_pool).await;
+        let tdb = get_tdb();
+        let pool = tdb.get_pool().await;
+        let (_rsvp, manager) = make_james_reservation(&pool).await;
 
         let filter = ReservationFilterBuilder::default()
             .user_id("james id")
@@ -382,5 +378,12 @@ mod tests {
         );
 
         (manager.reserve(rsvp).await.unwrap(), manager)
+    }
+
+    fn get_tdb() -> TestPg {
+        TestPg::new(
+            "postgres://postgres:postgres@localhost:5432",
+            "../migrations",
+        )
     }
 }

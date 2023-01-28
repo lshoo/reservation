@@ -156,10 +156,6 @@ async fn get_test_client(tconfig: &TestConfig) -> ReservationServiceClient<Chann
     let config = tconfig.config.clone();
     setup_server(&config);
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    println!("the server url: {:?}", config.server.url(false));
-
     let fut = async move {
         // if error on conn keep retry until timeout
         while ReservationServiceClient::connect(config.server.url(false))

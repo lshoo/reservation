@@ -29,7 +29,7 @@ pub trait Normalize: Validator {
 }
 
 pub trait ToSql {
-    fn to_sql(&self) -> Result<String, Error>;
+    fn to_sql(&self) -> String;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type)]
