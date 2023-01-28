@@ -63,8 +63,7 @@ impl ToSql for ReservationFilter {
 
         let direction = if self.desc { "DESC" } else { "ASC" };
 
-        format!("SELECT * FROM rsvp.reservations WHERE status = '{}'::rsvp.reservation_status AND {} AND {} ORDER BY id {} LIMIT {}",
-        status, cursor_cond, user_resource_cond, direction, limit)
+        format!("SELECT * FROM rsvp.reservations WHERE status = '{status}'::rsvp.reservation_status AND {cursor_cond} AND {user_resource_cond} ORDER BY id {direction} LIMIT {limit}")
     }
 }
 

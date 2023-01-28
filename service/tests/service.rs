@@ -184,10 +184,10 @@ async fn make_reservations(client: &mut ReservationServiceClient<Channel>, count
     for i in 0..count {
         let mut rsvp = Reservation::new_pending(
             "james id",
-            format!("Ocean view room {}", i),
+            format!("Ocean view room {i}"),
             "2022-12-25T15:00:00-0700".parse().unwrap(),
             "2022-12-30T00:00:00-0700".parse().unwrap(),
-            format!("test service in grpc with id {}", i),
+            format!("test service in grpc with id {i}"),
         );
 
         let ret = client

@@ -88,7 +88,7 @@ impl From<Error> for tonic::Status {
             }
 
             Error::ConflictReservation(info) => {
-                tonic::Status::failed_precondition(format!("Conflict Reservation: {:?}", info))
+                tonic::Status::failed_precondition(format!("Conflict Reservation: {info:?}"))
             }
 
             Error::InvalidTime

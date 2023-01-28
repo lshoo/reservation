@@ -58,8 +58,7 @@ impl ToSql for ReservationQuery {
         let user_resource_cond = get_user_resource_cond(&self.user_id, &self.resource_id);
 
         format!(
-            "SELECT * FROM rsvp.reservations WHERE {} @> timespan AND status = '{}'::rsvp.reservation_status AND {} ORDER BY lower(timespan) {}",
-            timespan, status, user_resource_cond, direction
+            "SELECT * FROM rsvp.reservations WHERE {timespan} @> timespan AND status = '{status}'::rsvp.reservation_status AND {user_resource_cond} ORDER BY lower(timespan) {direction}"
         )
     }
 }

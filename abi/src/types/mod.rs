@@ -40,12 +40,9 @@ pub fn get_timespan(start: Option<&Timestamp>, end: Option<&Timestamp>) -> PgRan
 pub fn get_user_resource_cond(user_id: &str, resource_id: &str) -> String {
     match (user_id.is_empty(), resource_id.is_empty()) {
         (true, true) => "TRUE".into(),
-        (true, false) => format!("resource_id = '{}'", resource_id),
-        (false, true) => format!("user_id = '{}'", user_id),
-        (false, false) => format!(
-            "user_id = '{}' AND resource_id = '{}'",
-            user_id, resource_id
-        ),
+        (true, false) => format!("resource_id = '{resource_id}'"),
+        (false, true) => format!("user_id = '{user_id}'"),
+        (false, false) => format!("user_id = '{user_id}' AND resource_id = '{resource_id}'"),
     }
 }
 

@@ -27,7 +27,7 @@ pub async fn start_server(config: &Config) -> Result<(), anyhow::Error> {
     let svc = RsvpService::from_config(config).await?;
     let svc = ReservationServiceServer::new(svc);
 
-    println!("Listening on {:?}", addr);
+    println!("Listening on {addr:?}");
     Server::builder().add_service(svc).serve(addr).await?;
 
     Ok(())
